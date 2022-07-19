@@ -1,33 +1,26 @@
-# Copyright 2020 Google, LLC.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# [START cloudrun_helloworld_service]
-# [START run_helloworld_service]
 import os
+import numpy as np
+import json
+from PIL import Image
+from google.cloud import aiplatform
+import flask
 
-from flask import Flask
 
-app = Flask(__name__)
+app = flask.Flask(__name__, static_url_path="")
 
+@app.get("/")
+def prediction():
+    IMAGE_DIRECTORY = "cifar_test_images"
+    image_files = [file for file in os.listdir(IMAGE_DIRECTORY) if file.endswith(".jpg")]
+    image_data = [np.asarray(Image.open(os.path.join(IMAGE_DIRECTORY, file))) for file in image_files]
+    x_test = [(image / 255.0).astype(np.float32).tolist() for image in image_data]
 
-@app.route("/")
-def hello_world():
-    name = os.environ.get("NAME", "World")
-    return "Hello {}!".format(name)
+    aiplatform.init(project="YOUR_PROJECT_ID", location="ENDPOINT_REGION")
+    endpoint = aiplatform.Endpoint("YOUR_ENDPOINT_ID")
+    predictions = endpoint.predict(instances=x_test)
+    return json.dumps(predictions, indent=2)
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-# [END run_helloworld_service]
-# [END cloudrun_helloworld_service]
+    os.environ["FLASK_ENV"] = "development"
+    app.run(host="localhost", port=8080, debug=True)
